@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>未来交通控制中心</title>
+<style>
+body{margin:0;font-family:"Microsoft YaHei",sans-serif;background:linear-gradient(#bde9ff,#ffffff);text-align:center;color:#123;}
+h1{color:#075aaa;margin:20px}.sub{font-size:18px}
+#game{display:flex;justify-content:center;gap:20px;margin:25px}
+.route{width:150px;height:360px;background:#eef8ff;border:3px solid #2b6cb0;border-radius:15px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
+.route.route-green{border-color:#18c964}
+.route.route-red{border-color:#ef4444}
+.route h3{position:absolute;top:-45px;color:#075aaa}
+.people{height:260px;width:120px;display:flex;flex-direction:column-reverse;align-items:center;gap:3px}
+.person{width:65px;height:65px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:grab;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}.person img{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.person.dragging{position:fixed;z-index:1000;pointer-events:none;cursor:grabbing;margin:0;box-shadow:0 8px 20px rgba(0,0,0,.25);transform:scale(1.05)}
+.person-placeholder{width:65px;height:65px;flex:0 0 65px}
+.vehicle{width:120px;height:70px;margin-top:8px;display:flex;align-items:center;justify-content:center}
+.vehicle img{width:120px;height:70px;object-fit:contain;display:block;pointer-events:none}
+.light{width:25px;height:25px;border-radius:50%;background:red;position:absolute;right:10px;top:10px}
+.green{background:#18c964}.red{background:red}
+#bank{min-height:80px;border:3px dashed #888;background:white;margin:10px auto;width:80%;padding:10px;border-radius:15px}
+button{font-size:18px;padding:10px 25px;border:0;border-radius:20px;background:#087cf0;color:white;cursor:pointer}
+.button-group{display:flex;justify-content:center;gap:12px}
+.restart-button{background:#f59e0b}
+#msg{font-size:22px;font-weight:bold;margin:15px}
+</style>
+</head>
+<body>
+<h1>🚦 未来交通控制中心</h1>
+<div class="sub">玩家身份：小小交通管理员</div>
+<div id="msg">请调度10位小朋友，让未来交通全部畅通！</div>
+<div id="bank"></div>
+<div id="game"></div>
+<div class="button-group">
+ <button type="button" onclick="checkGame()">启动智能检测</button>
+ <button type="button" class="restart-button" onclick="window.location.reload()">重新开始</button>
+</div>
+<script>
+let routes=[4,3,2,1,0];
+let avatars=["images-1/avatar-01.png","images-1/avatar-02.png","images-1/avatar-03.png","images-1/avatar-04.png","images-1/avatar-05.png","images-1/avatar-06.png","images-1/avatar-07.png","images-1/avatar-08.png","images-1/avatar-09.png","images-1/avatar-10.png"];
+let vehicleimages=['images-1/p1.png','images-1/p2.png','images-1/p3.png','images-1/p4.png','images-1/p5.png'];
+let bank=document.getElementById('bank');
+let game=document.getElementById('game');
+let activeDrag=null;
+
+function createPerson(src){
+ let d=document.createElement('div');d.className='person';
+ let img=document.createElement('img');img.src=src;img.draggable=false;d.appendChild(img);
+ d.addEventListener('pointerdown',startDrag);
+ d.addEventListener('pointermove',moveDrag);
+ d.addEventListener('pointerup',finishPointerDrag);
+ d.addEventListener('pointercancel',cancelPointerDrag);
+ return d;
+}
+
+function startDrag(event){
+ if(activeDrag||(event.pointerType==='mouse'&&event.button!==0))return;
+ event.preventDefault();
+ let person=event.currentTarget;
+ let rect=person.getBoundingClientRect();
+ let placeholder=document.createElement('div');placeholder.className='person-placeholder';
+ person.parentNode.insertBefore(placeholder,person);
+ activeDrag={person,placeholder,pointerId:event.pointerId,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
+ person.setPointerCapture(event.pointerId);
+ person.classList.add('dragging');
+ person.style.width=rect.width+'px';person.style.height=rect.height+'px';
+ person.style.left=(event.clientX-activeDrag.offsetX)+'px';person.style.top=(event.clientY-activeDrag.offsetY)+'px';
+}
+
+function moveDrag(event){
+ if(!activeDrag||event.pointerId!==activeDrag.pointerId)return;
+ event.preventDefault();
+ activeDrag.person.style.left=(event.clientX-activeDrag.offsetX)+'px';
+ activeDrag.person.style.top=(event.clientY-activeDrag.offsetY)+'px';
+}
+
+function finishPointerDrag(event){finishDrag(event,true)}
+function cancelPointerDrag(event){finishDrag(event,false)}
+
+function finishDrag(event,allowDrop){
+ if(!activeDrag||event.pointerId!==activeDrag.pointerId)return;
+ event.preventDefault();
+ let {person,placeholder,pointerId}=activeDrag;
+ let destination=null;
+ if(allowDrop){
+  let target=document.elementFromPoint(event.clientX,event.clientY);
+  let route=target&&target.closest('.route');
+  let bankTarget=target&&target.closest('#bank');
+  if(route)destination=route.querySelector('.people');
+  else if(bankTarget)destination=bank;
+ }
+ if(person.hasPointerCapture(pointerId))person.releasePointerCapture(pointerId);
+ person.classList.remove('dragging');
+ person.removeAttribute('style');
+ if(destination){destination.appendChild(person);placeholder.remove();}
+ else{placeholder.replaceWith(person);}
+ activeDrag=null;
+}
+avatars.forEach(e=>bank.appendChild(createPerson(e)));
+
+routes.forEach((n,i)=>{
+ let r=document.createElement('div');r.className='route';r.dataset.index=i;
+ r.innerHTML=`<div class="light red"></div><div class="people"></div><div class="vehicle"><img src="${vehicleimages[i]}" alt="路线 ${i+1} 车辆" draggable="false"></div>`;
+ game.appendChild(r);
+});
+
+function checkGame(){
+ let routes=document.querySelectorAll('.route');
+ let total=0,ok=true;
+ routes.forEach(r=>{
+  let c=r.querySelectorAll('.person').length; total+=c;
+  let light=r.querySelector('.light');
+  r.classList.remove('route-green','route-red');
+  if(c>0&&c<=3){
+   light.className='light green';
+   r.classList.add('route-green');
+  }else{
+   light.className='light red';
+   r.classList.add('route-red');
+   ok=false;
+  }
+ });
+ if(total!==10)ok=false;
+ if(ok){document.getElementById('msg').innerHTML='🎉 交通调度成功！所有线路绿色通行！'}
+ else{document.getElementById('msg').innerHTML='⚠️ 发现交通问题：请继续调整路线！'}
+}
+</script>
+</body>
+</html>
